@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCode Walkie-Talkie</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+    <div id="app">
+        <h1>Walkie-Talkie for OpenCode</h1>
+        <div id="scanner-container">
+            <div id="qr-reader"></div>
+        </div>
+        <div id="connection-status">Disconnected</div>
+        <div id="messages"></div>
+    </div>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="src/ws-client.js"></script>
+    <script src="src/qr-scanner.js"></script>
+    <script src="src/ui.js"></script>
+    <script src="src/app.js"></script>
+</body>
+</html>
