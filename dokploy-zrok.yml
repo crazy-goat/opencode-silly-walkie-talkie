@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Zrok Controller (API + Database)
+  zrok-controller:
+    image: openziti/zrok:latest
+    command: controller
+    environment:
+      - ZROK_API_ENDPOINT=https://api.zrok.twojadomena.pl  # Zmień!
+      - ZROK_FRONTEND_ENDPOINTS=https://*.zrok.twojadomena.pl  # Wildcard
+      - ZROK_ADMIN_TOKEN=${ZROK_ADMIN_TOKEN:-changeme}
+      - ZROK_ENABLE_PUBLIC=true
+    volumes:
+      - zrok-data:/var/lib/zrok
+    ports:
+      - "18080:18080"  # Controller API
+    networks:
+      - zrok-network
+    restart: unless-stopped
+
+  # Zrok Frontend (public facing)
+  zrok-frontend:
+    image: openziti/zrok:latest
+    command: frontend
+    environment:
+      - ZROK_API_ENDPOINT=http://zrok-controller:18080
+      - ZROK_FRONTEND_ENDPOINT=https://tunel.zrok.twojadomena.pl  # Zmień!
+      - ZROK_TOKEN=${ZROK_TOKEN}
+    ports:
+      - "8080:8080"  # Public HTTP
+      - "443:443"    # Public HTTPS (jeśli masz certyfikaty)
+    networks:
+      - zrok-network
+    depends_on:
+      - zrok-controller
+    restart: unless-stopped
+
+  # Zrok Router (opcjonalnie - dla lepszej wydajności)
+  zrok-router:
+    image: openziti/zrok:latest
+    command: router
+    environment:
+      - ZROK_API_ENDPOINT=http://zrok-controller:18080
+    networks:
+      - zrok-network
+    depends_on:
+      - zrok-controller
+    restart: unless-stopped
+
+volumes:
+  zrok-data:
+
+networks:
+  zrok-network:
+    driver: bridge

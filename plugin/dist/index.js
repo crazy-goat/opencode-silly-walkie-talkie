@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WalkieTalkiePlugin = void 0;
 const server_1 = require("./server");
-const ngrok_1 = require("./ngrok");
+const tunnel_1 = require("./tunnel");
 const qr_1 = require("./qr");
 // Store server instance for cleanup
 let server = null;
@@ -17,8 +17,8 @@ const WalkieTalkiePlugin = async ({ client, project }) => {
     try {
         const port = await server.start(0); // Random available port
         console.log(`[Walkie-Talkie] WebSocket server started on port ${port}`);
-        // Start ngrok tunnel
-        const publicUrl = await (0, ngrok_1.startNgrokTunnel)(port);
+        // Start tunnel (ngrok or zrok)
+        const publicUrl = await (0, tunnel_1.startTunnel)(port);
         const token = server.getToken();
         // Generate and display QR
         const qr = await (0, qr_1.generateQRCode)(publicUrl, token);
@@ -50,7 +50,7 @@ const WalkieTalkiePlugin = async ({ client, project }) => {
     process.on('SIGINT', async () => {
         if (server) {
             await server.stop();
-            await (0, ngrok_1.stopNgrokTunnel)();
+            await (0, tunnel_1.stopTunnel)();
         }
         process.exit(0);
     });

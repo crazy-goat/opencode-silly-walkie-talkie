@@ -24,12 +24,45 @@ Add to your `opencode.json`:
 }
 ```
 
-### 2. Setup ngrok
+### 2a. Setup ngrok (Easy, Free tier = 1h limit)
 
 ```bash
 npm install -g ngrok
 ngrok config add-authtoken <your_token>
 ```
+
+### 2b. Setup zrok self-hosted (Best - no limits, your own domain)
+
+If you have a VPS with Dokploy:
+
+**On your VPS:**
+```bash
+# Deploy dokploy-zrok.yml to Dokploy
+cd /home/decodo/work/open-code-silly-walkie-talkie
+dokploy deploy -f dokploy-zrok.yml
+```
+
+**DNS Configuration:**
+```
+api.zrok.twojadomena.pl    → YOUR_VPS_IP
+*.zrok.twojadomena.pl      → YOUR_VPS_IP
+tunel.zrok.twojadomena.pl  → YOUR_VPS_IP
+```
+
+**On your local machine:**
+```bash
+# Install zrok CLI
+curl -sSL https://get.openziti.io/install.bash | bash
+
+# Enable zrok environment (one-time setup)
+zrok enable <TOKEN_FROM_CONTROLLER> --api-url https://api.zrok.twojadomena.pl
+
+# Set environment variable
+export ZROK_TOKEN=<your_token>
+export ZROK_API_URL=https://api.zrok.twojadomena.pl
+```
+
+The plugin will automatically use zrok if `ZROK_TOKEN` is set, otherwise falls back to ngrok.
 
 ### 3. Start OpenCode
 
@@ -105,16 +138,16 @@ npx serve .
 ## Troubleshooting
 
 **QR code not displaying?**
-- Make sure ngrok authtoken is configured
+- Make sure ngrok authtoken is configured (or ZROK_TOKEN for zrok)
 - Check that port 8765 is not in use
 
 **Cannot connect from phone?**
 - Ensure your phone is on the same network (for local testing)
-- Check that ngrok tunnel is active
+- Check that ngrok/zrok tunnel is active
 
 **Connection drops?**
-- Normal for ngrok free tier (1 hour limit)
-- Restart OpenCode to get new QR code
+- With ngrok free tier: normal (1 hour limit), restart OpenCode to get new QR code
+- With zrok self-hosted: shouldn't happen, check VPS status
 
 ## License
 

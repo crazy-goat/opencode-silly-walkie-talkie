@@ -1,5 +1,5 @@
 import { WalkieServer } from './server';
-import { startNgrokTunnel, stopNgrokTunnel } from './ngrok';
+import { startTunnel, stopTunnel } from './tunnel';
 import { generateQRCode, displayQRCode } from './qr';
 import type { Message } from './protocol';
 
@@ -20,8 +20,8 @@ export const WalkieTalkiePlugin = async ({ client, project }: any) => {
     const port = await server.start(0); // Random available port
     console.log(`[Walkie-Talkie] WebSocket server started on port ${port}`);
     
-    // Start ngrok tunnel
-    const publicUrl = await startNgrokTunnel(port);
+    // Start tunnel (ngrok or zrok)
+    const publicUrl = await startTunnel(port);
     const token = server.getToken();
     
     // Generate and display QR
@@ -56,7 +56,7 @@ export const WalkieTalkiePlugin = async ({ client, project }: any) => {
   process.on('SIGINT', async () => {
     if (server) {
       await server.stop();
-      await stopNgrokTunnel();
+      await stopTunnel();
     }
     process.exit(0);
   });
