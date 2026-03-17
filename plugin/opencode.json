@@ -1,0 +1,4 @@
+{
+  "name": "walkie-talkie",
+  "entry": "dist/index.js"
+}
