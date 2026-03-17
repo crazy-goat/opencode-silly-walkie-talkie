@@ -37,28 +37,46 @@ If you have a VPS with Dokploy:
 
 **On your VPS:**
 ```bash
-# Deploy dokploy-zrok.yml to Dokploy
+# 1. Klonuj repo lub skopiuj pliki
 cd /home/decodo/work/open-code-silly-walkie-talkie
-dokploy deploy -f dokploy-zrok.yml
+
+# 2. Skonfiguruj zmienne środowiskowe
+cp .env.example .env
+# Edytuj .env - ustaw swoje domeny i tokeny
+nano .env
+
+# 3. Deploy do Dokploy
+dokploy deploy -f dokploy-zrok.yml --env-file .env
 ```
 
-**DNS Configuration:**
+**Wymagana konfiguracja DNS (np. Cloudflare):**
 ```
-api.zrok.twojadomena.pl    → YOUR_VPS_IP
-*.zrok.twojadomena.pl      → YOUR_VPS_IP
-tunel.zrok.twojadomena.pl  → YOUR_VPS_IP
+A    api.zrok.twojadomena.pl    → YOUR_VPS_IP
+A    *.zrok.twojadomena.pl      → YOUR_VPS_IP  
+A    tunel.zrok.twojadomena.pl  → YOUR_VPS_IP
 ```
 
-**On your local machine:**
+**Pierwsze uruchomienie - generowanie tokena użytkownika:**
 ```bash
-# Install zrok CLI
+# Po uruchomieniu controllera, wygeneruj token dla użytkownika
+curl -X POST https://api.zrok.twojadomena.pl:18080/api/v1/users \
+  -H "X-Admin-Token: <ZROK_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+
+# Odpowiedź zawiera token - zapisz go do .env jako ZROK_TOKEN i zrestartuj
+```
+
+**Na Twoim komputerze lokalnym:**
+```bash
+# Instalacja zrok CLI
 curl -sSL https://get.openziti.io/install.bash | bash
 
-# Enable zrok environment (one-time setup)
-zrok enable <TOKEN_FROM_CONTROLLER> --api-url https://api.zrok.twojadomena.pl
+# Aktywacja (one-time setup)
+zrok enable <ZROK_TOKEN> --api-url https://api.zrok.twojadomena.pl
 
-# Set environment variable
-export ZROK_TOKEN=<your_token>
+# Konfiguracja pluginu
+export ZROK_TOKEN=<ZROK_TOKEN>
 export ZROK_API_URL=https://api.zrok.twojadomena.pl
 ```
 
