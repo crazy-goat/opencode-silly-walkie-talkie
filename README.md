@@ -1,112 +1,121 @@
-# OpenCode Silly Walkie-Talkie
+# OpenCode Walkie-Talkie
 
-## Podsumowanie projektu
+📱 Get mobile notifications when your AI assistant needs you.
 
-Plugin do OpenCode.ai, który pozwala na powiadamianie użytkownika na telefonie/komórce, gdy LLM ma pytanie lub skończył odpowiedź. Użytkownik może odpowiadać z komórki słownie przez klawiaturę Google/Apple i kontynuować rozmowę z LLM.
+Walkie-Talkie is a plugin for OpenCode that sends real-time notifications to your phone or tablet when:
+- LLM finishes generating a response
+- LLM is waiting for your input
 
-## Główny problem do rozwiązania
+## Quick Start
 
-Komunikacja bezpieczna między OpenCode (działającym lokalnie) a aplikacją mobilną musi działać zarówno w sieci lokalnej, jak i zdalnie — przy czym komputer z OpenCode może być za firewallem/NAT bez publicznego IP.
+### 1. Install the Plugin
 
-## Architektura
+```bash
+cd plugin
+npm install
+npm run build
+npm link
+```
 
-### 1. Plugin OpenCode (TypeScript/Node.js)
-- Monitoruje sesję rozmowy z LLM
-- Uruchamia lokalny serwer WebSocket
-- Generuje QR kod z:
-  - Publicznym URL (przez tunel)
-  - Tokenem autoryzacyjnym/szyfrowania
-- Wysyła eventy do podłączonych klientów:
-  - Gdy LLM zakończył odpowiedź
-  - Gdy czeka na input użytkownika
-- Obsługuje żądania:
-  - Pobranie pełnej historii rozmowy
-  - Dodanie nowej wiadomości od użytkownika
+Add to your `opencode.json`:
+```json
+{
+  "plugins": ["@crazy-goat/opencode-walkie-talkie"]
+}
+```
 
-### 2. Tunel (zrok self-hosted na Dokploy)
-- Wybrane rozwiązanie: **zrok self-hosted**
-- Uruchamiane na własnym VPS z Dokploy
-- Konfiguracja: akceptuje połączenia bez rejestracji użytkowników (open/public mode)
-- Plugin łączy się do zrok → otrzymuje publiczny URL → generuje QR
+### 2. Setup ngrok
 
-### 3. Aplikacja mobilna — PWA (Progressive Web App)
-- Platforma: React Native / PWA w przeglądarce
-- Funkcje:
-  - Lista monitorowanych sesji OpenCode (wiele maszyn)
-  - Badge/ikona powiadomienia gdy sesja ma nowe zdarzenie
-  - Pobieranie pełnej historii rozmowy po kliknięciu
-  - Pole tekstowe do wpisania następnej instrukcji
-  - Powiadomienia push przez Web Push API (działa nawet gdy PWA zamknięta)
+```bash
+npm install -g ngrok
+ngrok config add-authtoken <your_token>
+```
 
-## Parowanie urządzeń (QR Code)
+### 3. Start OpenCode
 
-1. Użytkownik w OpenCode uruchamia komendę generującą QR
-2. QR zawiera:
-   - URL WebSocket serwera (przez tunel zrok)
-   - Jednorazowy klucz/token autoryzacyjny
-3. Użytkownik skanuje QR telefonem → PWA łączy się z pluginem
-4. Połączenie WebSocket pozostaje aktywne, eventy przesyłane real-time
+When you start OpenCode, the plugin will:
+1. Start a WebSocket server
+2. Create an ngrok tunnel
+3. Display a QR code in your terminal
 
-## Komunikacja WebSocket
+### 4. Scan QR with Your Phone
 
-### Eventy z pluginu do PWA:
-- `session:ended` — LLM zakończył odpowiedź
-- `session:awaiting_input` — LLM czeka na input
-- `conversation:history` — pełna historia rozmowy (odpowiedź na żądanie)
+1. Open the PWA URL (or host it locally)
+2. Allow camera access
+3. Scan the QR code displayed in OpenCode terminal
+4. You're connected!
 
-### Komendy z PWA do pluginu:
-- `get_conversation` — pobierz historię
-- `send_message` — dodaj wiadomość użytkownika
-- `ping` — keepalive
+## Using the PWA
 
-## Szyfrowanie
+### Option A: Local Development
 
-- HTTPS/TLS przez tunel (zrok) — bezpieczeństwo transportu
-- Dodatkowy token autoryzacyjny w URL/QR — tylko sparowane urządzenie może się połączyć
-- Opcjonalnie: symetryczne AES dla payloadów (jeśli potrzebna dodatkowa warstwa)
+```bash
+cd pwa
+# Serve with any static server
+npx serve .
+# Or
+python3 -m http.server 8080
+```
 
-## Technologie
+Open `http://localhost:8080` on your phone.
 
-- **Plugin**: TypeScript, Node.js, WebSocket (ws lub socket.io), @ngrok/ngrok (początkowo) / zrok (docelowo)
-- **Tunel**: zrok self-hosted (Go) na Dokploy + VPS
-- **PWA**: React/TypeScript, Web Push API, WebSocket client
-- **Deploy**: GitHub Actions, Docker
+### Option B: Deploy
 
-## Fazy rozwoju (POC → Produkcja)
+Deploy `pwa/` folder to any static hosting:
+- GitHub Pages
+- Netlify
+- Vercel
+- Cloudflare Pages
 
-### POC (Proof of Concept)
-1. Podstawowy plugin OpenCode z WebSocket serwerem
-2. Integracja z zrok.io (chmura) — bez własnego serwera
-3. Prosta PWA — lista sesji, badge, odpowiadanie
-4. QR kod z URL + tokenem
+## Architecture
 
-### Produkcja
-1. Migracja na własny zrok self-hosted
-2. Zaawansowane powiadomienia push (nawet gdy PWA nieaktywna)
-3. Szyfrowanie end-to-end
-4. Autentykacja użytkownika
-5. Wielu użytkowników na jednej sesji
+```
+OpenCode (plugin)  ←──WebSocket──→  PWA (phone/tablet)
+      ↓
+   ngrok tunnel (public URL)
+```
 
-## Skrót nazwy projektu
+## Protocol
 
-**OpenCode Silly Walkie-Talkie** — nawiązanie do Monty Pythona (Silly Walks), ale w wersji wojskowej "walkie-talkie" (radiotelefon). Cel: szybka, nieformalna komunikacja z LLM jak na polu walki.
+WebSocket events:
+- `heartbeat` (every 10s)
+- `new_message` (when LLM sends content)
+- `end` (when LLM finishes)
+- `messages` (message history)
 
-## Repozytorium
+## Development
 
-- GitHub: `crazy-goat/open-code-silly-walkie-talkie`
-- Publiczne
-- Issue #1: https://github.com/crazy-goat/open-code-silly-walkie-talkie/issues/1
+### Plugin
 
-## Następne kroki
+```bash
+cd plugin
+npm install
+npm run dev    # Watch mode
+npm test       # Run tests
+```
 
-1. Zainstalować zrok na VPS/Dokploy
-2. Stworzyć strukturę monorepo (plugin + PWA)
-3. Implementacja pluginu OpenCode (WebSocket server)
-4. Implementacja PWA (React + WebSocket client)
-5. Integracja z tunel zrok
-6. Testowanie parowania QR
+### PWA
 
-## Autor
+```bash
+cd pwa
+# Serve locally
+npx serve .
+```
 
-Inicjatywa: crazy-goat / s2x
-Cel: Udostępnienie narzędzia dla społeczności OpenCode
+## Troubleshooting
+
+**QR code not displaying?**
+- Make sure ngrok authtoken is configured
+- Check that port 8765 is not in use
+
+**Cannot connect from phone?**
+- Ensure your phone is on the same network (for local testing)
+- Check that ngrok tunnel is active
+
+**Connection drops?**
+- Normal for ngrok free tier (1 hour limit)
+- Restart OpenCode to get new QR code
+
+## License
+
+MIT
