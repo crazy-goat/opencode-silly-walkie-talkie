@@ -1,1 +1,22 @@
-<!-- placeholder -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenCode Walkie-Talkie</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <div id="app">
+    <h1>Walkie-Talkie</h1>
+    <div id="session-list"></div>
+    <div id="add-session">
+      <input type="text" id="ws-url-input" placeholder="wss://ip:port/token" />
+      <button id="add-btn">Add Session</button>
+    </div>
+  </div>
+  <script src="src/sessions.js"></script>
+  <script src="src/ws-client.js"></script>
+  <script src="src/index-app.js"></script>
+</body>
+</html>
