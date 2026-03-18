@@ -24,14 +24,7 @@ Add to your `opencode.json`:
 }
 ```
 
-### 2a. Setup ngrok (Easy, Free tier = 1h limit)
-
-```bash
-npm install -g ngrok
-ngrok config add-authtoken <your_token>
-```
-
-### 2b. Setup zrok self-hosted (Best - no limits, your own domain)
+### 2. Setup (Best - no limits, your own domain)
 
 If you have a VPS with Dokploy:
 
@@ -80,14 +73,13 @@ export ZROK_TOKEN=<ZROK_TOKEN>
 export ZROK_API_URL=https://api.zrok.twojadomena.pl
 ```
 
-The plugin will automatically use zrok if `ZROK_TOKEN` is set, otherwise falls back to ngrok.
+The plugin will automatically use zrok if `ZROK_TOKEN` is set, otherwise falls back to local network connection.
 
 ### 3. Start OpenCode
 
 When you start OpenCode, the plugin will:
 1. Start a WebSocket server
-2. Create an ngrok tunnel
-3. Display a QR code in your terminal
+2. Display a QR code in your terminal
 
 ### 4. Scan QR with Your Phone
 
@@ -118,12 +110,40 @@ Deploy `pwa/` folder to any static hosting:
 - Vercel
 - Cloudflare Pages
 
+## TLS / HTTPS
+
+Walkie-Talkie requires HTTPS/WSS because browsers block camera access on plain HTTP.
+The plugin auto-generates a self-signed TLS certificate on first start and saves it to:
+
+```
+~/.config/opencode/walkie-tls/cert.pem
+~/.config/opencode/walkie-tls/key.pem
+```
+
+### Accepting the certificate on your phone
+
+When you open the PWA URL on your phone, you'll see a "Your connection is not private" warning.
+This is expected for self-signed certs. Tap **Advanced → Proceed** (Chrome) or **Show Details → visit this website** (Safari).
+
+### Generating the certificate manually
+
+If auto-generation fails (e.g. `openssl` not found), generate it manually:
+
+```bash
+mkdir -p ~/.config/opencode/walkie-tls
+openssl req -x509 -newkey rsa:2048 \
+  -keyout ~/.config/opencode/walkie-tls/key.pem \
+  -out ~/.config/opencode/walkie-tls/cert.pem \
+  -days 3650 -nodes \
+  -subj "/CN=walkie-talkie-local"
+```
+
+The certificate is valid for 10 years and reused across sessions.
+
 ## Architecture
 
 ```
 OpenCode (plugin)  ←──WebSocket──→  PWA (phone/tablet)
-      ↓
-   ngrok tunnel (public URL)
 ```
 
 ## Protocol
@@ -155,17 +175,8 @@ npx serve .
 
 ## Troubleshooting
 
-**QR code not displaying?**
-- Make sure ngrok authtoken is configured (or ZROK_TOKEN for zrok)
-- Check that port 8765 is not in use
-
-**Cannot connect from phone?**
-- Ensure your phone is on the same network (for local testing)
-- Check that ngrok/zrok tunnel is active
-
 **Connection drops?**
-- With ngrok free tier: normal (1 hour limit), restart OpenCode to get new QR code
-- With zrok self-hosted: shouldn't happen, check VPS status
+- Check your local network or zrok status.
 
 ## License
 
