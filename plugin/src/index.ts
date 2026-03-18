@@ -77,7 +77,8 @@ export default async ({ client }: any) => {
       const wsUrl = token ? `wss://${ip}:${port}/${token}` : `wss://${ip}:${port}`;
 
       const httpUrl = `https://${ip}:${port}`;
-      const qr = await generateQRCode(httpUrl);
+      const autoConnectUrl = `${httpUrl}/?wsUrl=${encodeURIComponent(wsUrl)}`;
+      const qr = await generateQRCode(autoConnectUrl);
       const replacement = `\`\`\`\n${qr}\n\`\`\`\nOpen on phone: ${httpUrl}\nWebSocket: ${wsUrl}`;
       output.text = output.text.replace(fullMatch, replacement);
     }
