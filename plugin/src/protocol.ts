@@ -1,7 +1,7 @@
 // WebSocket Protocol Types for OpenCode Walkie-Talkie
 
-export type EventType = 'heartbeat' | 'new_message' | 'end' | 'messages' | 'awaiting_input' | 'pong';
-export type CommandType = 'get_messages' | 'ping' | 'bye' | 'send_message';
+export type EventType = 'heartbeat' | 'new_message' | 'end' | 'messages' | 'awaiting_input' | 'pong' | 'question';
+export type CommandType = 'get_messages' | 'ping' | 'bye' | 'send_message' | 'answer_question';
 
 export interface Message {
   id: string;
@@ -41,13 +41,33 @@ export interface PongEvent {
   timestamp: number;
 }
 
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface QuestionInfoPayload {
+  question: string;
+  header: string;
+  options: QuestionOption[];
+  multiple?: boolean;
+  custom?: boolean;
+}
+
+export interface QuestionEvent {
+  type: 'question';
+  requestID: string;
+  questions: QuestionInfoPayload[];
+}
+
 export type ServerEvent = 
   | HeartbeatEvent 
   | NewMessageEvent 
   | EndEvent 
   | MessagesEvent 
   | AwaitingInputEvent
-  | PongEvent;
+  | PongEvent
+  | QuestionEvent;
 
 // Commands: Client -> Server
 export interface GetMessagesCommand {
@@ -67,11 +87,18 @@ export interface SendMessageCommand {
   content: string;
 }
 
+export interface AnswerQuestionCommand {
+  type: 'answer_question';
+  requestID: string;
+  answers: string[][];
+}
+
 export type ClientCommand = 
   | GetMessagesCommand 
   | PingCommand 
   | ByeCommand
-  | SendMessageCommand;
+  | SendMessageCommand
+  | AnswerQuestionCommand;
 
 // WebSocket message wrapper
 export interface WebSocketMessage {
