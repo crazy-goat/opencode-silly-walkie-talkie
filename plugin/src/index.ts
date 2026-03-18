@@ -23,6 +23,13 @@ export default async ({ client }: any) => {
     }).catch(() => {});
   };
 
+  server.onAnswer = (requestID: string, answers: string[][]) => {
+    client.question.reply({
+      path: { requestID },
+      body: { answers },
+    }).catch(() => {});
+  };
+
   return {
     tool: {
       walkie_qr: {
@@ -78,6 +85,21 @@ export default async ({ client }: any) => {
       if (event.type === 'session.idle') {
         _flushPending();
         server.broadcast({ type: 'end' });
+      }
+
+      if (event.type === 'question.asked') {
+        const req = event.properties;
+        server.broadcast({
+          type: 'question',
+          requestID: req.id,
+          questions: req.questions.map((q: any) => ({
+            question: q.question,
+            header: q.header,
+            options: q.options,
+            multiple: q.multiple,
+            custom: q.custom,
+          })),
+        });
       }
     },
 

@@ -118,6 +118,7 @@ export class WalkieServer {
   }
 
   onMessage: ((content: string) => void) | null = null;
+  onAnswer: ((requestID: string, answers: string[][]) => void) | null = null;
 
   private _handleCommand(ws: any, command: ClientCommand): void {
     switch (command.type) {
@@ -130,6 +131,11 @@ export class WalkieServer {
       case 'send_message':
         if (this.onMessage && (command as any).content) {
           this.onMessage((command as any).content);
+        }
+        break;
+      case 'answer_question':
+        if (this.onAnswer) {
+          this.onAnswer((command as any).requestID, (command as any).answers);
         }
         break;
       case 'bye':
