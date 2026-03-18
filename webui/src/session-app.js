@@ -71,9 +71,12 @@ class SessionApp {
 
     container.style.display = 'flex';
 
+    const stopMic = this._setupMic(micBtn, textarea);
+
     const send = () => {
       const text = textarea.value.trim();
       if (!text) return;
+      stopMic();
       this.client.send({ type: 'send_message', content: text });
       this.ui.addMessage({ role: 'user', content: text, timestamp: Date.now() });
       textarea.value = '';
@@ -83,15 +86,13 @@ class SessionApp {
     textarea.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
-
-    this._setupMic(micBtn, textarea);
   }
 
   _setupMic(micBtn, textarea) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       micBtn.style.display = 'none';
-      return;
+      return () => {};
     }
 
     const recognition = new SpeechRecognition();
@@ -133,6 +134,8 @@ class SessionApp {
         recognition.start();
       }
     });
+
+    return () => { if (listening) recognition.stop(); };
   }
 }
 
