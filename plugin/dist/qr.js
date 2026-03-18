@@ -34,29 +34,45 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateQRCode = generateQRCode;
+exports.openQRInBrowser = openQRInBrowser;
 exports.displayQRCode = displayQRCode;
 const QRCode = __importStar(require("qrcode"));
+const fs = __importStar(require("fs"));
+const os = __importStar(require("os"));
+const path = __importStar(require("path"));
+const child_process_1 = require("child_process");
 async function generateQRCode(url, token) {
     const fullUrl = `${url}?token=${token}`;
     try {
-        // Generate terminal-friendly QR code
-        const qr = await QRCode.toString(fullUrl, {
-            type: 'terminal',
-            small: true,
-        });
-        return qr;
+        return await QRCode.toString(fullUrl, { type: 'terminal', small: true });
     }
     catch (err) {
-        console.error('[Walkie-Talkie] Failed to generate QR:', err);
-        // Fallback: just return the URL
         return `Scan this URL:\n${fullUrl}`;
     }
 }
+async function openQRInBrowser(url, token) {
+    const fullUrl = `${url}?token=${token}`;
+    const dataUrl = await QRCode.toDataURL(fullUrl);
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Walkie-Talkie QR</title>
+<style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;background:#111;color:#fff;}img{width:300px;height:300px;}p{margin-top:16px;font-size:14px;opacity:.6;}a{color:#7cf;}</style>
+</head>
+<body>
+<img src="${dataUrl}" />
+<p>Scan with Walkie-Talkie PWA</p>
+<p><a href="${fullUrl}">${fullUrl}</a></p>
+</body>
+</html>`;
+    const tmpFile = path.join(os.tmpdir(), 'walkie-talkie-qr.html');
+    fs.writeFileSync(tmpFile, html);
+    const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+    (0, child_process_1.exec)(`${opener} ${tmpFile}`);
+}
 function displayQRCode(qr) {
     console.log('\n┌─────────────────────────────────────┐');
-    console.log('│  📱 Scan with Walkie-Talkie PWA    │');
+    console.log('│  Scan with Walkie-Talkie PWA       │');
     console.log('└─────────────────────────────────────┘');
     console.log(qr);
-    console.log('');
 }
 //# sourceMappingURL=qr.js.map

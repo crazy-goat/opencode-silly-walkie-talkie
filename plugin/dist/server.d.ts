@@ -6,6 +6,7 @@ export declare class WalkieServer {
     private heartbeatInterval;
     private messages;
     private port;
+    private nextConnectionCallback;
     start(port?: number): Promise<number>;
     private handleConnection;
     private handleCommand;
@@ -13,6 +14,7 @@ export declare class WalkieServer {
     broadcast(event: ServerEvent): void;
     addMessage(message: Message): void;
     private startHeartbeat;
+    onNextConnection(cb: (() => void) | null): void;
     getToken(): string;
     getPort(): number;
     stop(): Promise<void>;

@@ -1,9 +1,6 @@
-export declare const WalkieTalkiePlugin: ({ client, project }: any) => Promise<{
-    'session.idle'?: undefined;
-    'message.updated'?: undefined;
-    'session.status'?: undefined;
-} | {
-    'session.idle': (event: any) => Promise<void>;
+export declare const WalkieTalkiePlugin: ({ client }: any) => Promise<{
+    'command.execute.before': (input: any, output: any) => Promise<void>;
+    'session.idle': () => Promise<void>;
     'message.updated': (event: any) => Promise<void>;
     'session.status': (event: any) => Promise<void>;
 }>;

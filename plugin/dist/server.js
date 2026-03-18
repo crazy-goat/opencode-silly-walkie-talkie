@@ -10,10 +10,12 @@ class WalkieServer {
     heartbeatInterval = null;
     messages = [];
     port = 0;
+    nextConnectionCallback = null;
     async start(port = 0) {
         this.port = port;
         this.token = (0, uuid_1.v4)();
         this.wss = new ws_1.WebSocketServer({ port: this.port });
+        this.wss.on('listening', () => this.wss._server?.unref());
         this.wss.on('connection', (ws, req) => {
             this.handleConnection(ws, req);
         });
@@ -39,6 +41,11 @@ class WalkieServer {
         }
         const client = { ws, isAlive: true, lastPong: Date.now() };
         this.clients.set(ws, client);
+        if (this.nextConnectionCallback) {
+            const cb = this.nextConnectionCallback;
+            this.nextConnectionCallback = null;
+            cb();
+        }
         ws.on('message', (data) => {
             try {
                 const command = JSON.parse(data.toString());
@@ -86,6 +93,7 @@ class WalkieServer {
     }
     startHeartbeat() {
         this.heartbeatInterval = setInterval(() => {
+            this.heartbeatInterval?.unref();
             this.broadcast({ type: 'heartbeat', timestamp: Date.now() });
             // Check for dead connections (30s timeout)
             const now = Date.now();
@@ -96,6 +104,9 @@ class WalkieServer {
                 }
             }
         }, 10000); // Every 10s
+    }
+    onNextConnection(cb) {
+        this.nextConnectionCallback = cb;
     }
     getToken() {
         return this.token;
