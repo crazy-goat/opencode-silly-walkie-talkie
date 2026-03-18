@@ -5,12 +5,15 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 func main() {
+	home, _ := os.UserHomeDir()
 	addr := flag.String("addr", ":3000", "listen address")
-	certFile := flag.String("cert", "/etc/walkie-tls/cert.pem", "TLS cert")
-	keyFile := flag.String("key", "/etc/walkie-tls/key.pem", "TLS key")
+	certFile := flag.String("cert", filepath.Join(home, ".config/opencode/walkie-tls/cert.pem"), "TLS cert")
+	keyFile := flag.String("key", filepath.Join(home, ".config/opencode/walkie-tls/key.pem"), "TLS key")
 	staticDir := flag.String("static", "/app/webui", "static files dir")
 	flag.Parse()
 
@@ -23,7 +26,7 @@ func main() {
 	mux.HandleFunc("/ws/", HandleProxy)
 	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))
 
-	cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	cert, err := ensureTLSCert(*certFile, *keyFile)
 	if err != nil {
 		log.Fatalf("TLS: %v", err)
 	}
