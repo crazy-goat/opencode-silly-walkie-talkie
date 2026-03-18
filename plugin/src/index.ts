@@ -4,6 +4,7 @@ import { generateQRCode } from './qr';
 
 let server: any = null;
 let sessionId: string | null = null;
+let pendingMessage: { id: string; text: string } | null = null;
 
 const WALKIE_XML_RE = /<walkie-connection ip="([^"]+)" port="(\d+)" token="([^"]*)"\s*\/>/;
 
@@ -53,18 +54,29 @@ export default async ({ client }: any) => {
         const text = parts.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('');
         
         if (text) {
-          server.broadcast({ 
-            type: 'new_message', 
-            message: { role: 'assistant', content: text, timestamp: Date.now() } 
-          });
+          pendingMessage = { id: info.id, text };
         }
       }
 
       if (event.type === 'session.status' && event.status === 'awaiting_input') {
+        if (pendingMessage) {
+          server.broadcast({ 
+            type: 'new_message', 
+            message: { role: 'assistant', content: pendingMessage.text, timestamp: Date.now() } 
+          });
+          pendingMessage = null;
+        }
         server.broadcast({ type: 'awaiting_input' });
       }
 
       if (event.type === 'session.idle') {
+        if (pendingMessage) {
+          server.broadcast({ 
+            type: 'new_message', 
+            message: { role: 'assistant', content: pendingMessage.text, timestamp: Date.now() } 
+          });
+          pendingMessage = null;
+        }
         server.broadcast({ type: 'end' });
       }
     },
