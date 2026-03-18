@@ -1,108 +1,85 @@
 import { WalkieServer } from './server';
-import { startTunnel, stopTunnel } from './tunnel';
-import { generateQRCode, displayQRCode } from './qr';
-import type { Message } from './protocol';
+import { getLocalIp } from './tunnel';
+import { generateQRCode } from './qr';
 
-// Store server instance for cleanup
-let server: WalkieServer | null = null;
-let isInitialized = false;
+let server: any = null;
+let sessionId: string | null = null;
 
-export const WalkieTalkiePlugin = async ({ client, project }: any) => {
-  if (isInitialized) {
-    console.log('[Walkie-Talkie] Already initialized');
-    return {};
-  }
+const WALKIE_XML_RE = /<walkie-connection ip="([^"]+)" port="(\d+)" token="([^"]*)"\s*\/>/;
 
-  // Initialize server
-  server = new WalkieServer();
-  
-  try {
-    const port = await server.start(0); // Random available port
-    console.log(`[Walkie-Talkie] WebSocket server started on port ${port}`);
-    
-    // Start tunnel (ngrok or zrok)
-    const publicUrl = await startTunnel(port);
-    const token = server.getToken();
-    
-    // Generate and display QR
-    const qr = await generateQRCode(publicUrl, token);
-    displayQRCode(qr);
-    
-    isInitialized = true;
-    
-    // Log info
-    await client.app.log({
-      body: {
-        service: 'walkie-talkie',
-        level: 'info',
-        message: 'Walkie-Talkie plugin initialized',
-        extra: { url: publicUrl },
-      },
-    });
-  } catch (err) {
-    console.error('[Walkie-Talkie] Initialization failed:', err);
-    await client.app.log({
-      body: {
-        service: 'walkie-talkie',
-        level: 'error',
-        message: 'Failed to initialize Walkie-Talkie',
-        extra: { error: String(err) },
-      },
-    });
-    return {};
-  }
+export default async ({ client }: any) => {
+  // Start server on random port, no token by default
+  server = new WalkieServer('');
+  const port = await server.start(0);
 
-  // Cleanup on process exit
-  process.on('SIGINT', async () => {
-    if (server) {
-      await server.stop();
-      await stopTunnel();
-    }
-    process.exit(0);
-  });
+  // Forward messages from PWA to OpenCode session
+  server.onMessage = (content: string) => {
+    if (!sessionId) return;
+    client.session.promptAsync({
+      path: { id: sessionId },
+      body: { parts: [{ type: 'text', text: content }] }
+    }).catch(() => {});
+  };
 
   return {
-    // Hook: LLM finished responding
-    'session.idle': async (event: any) => {
-      if (server) {
-        server.broadcast({
-          type: 'end',
-          timestamp: Date.now(),
-        });
+    tool: {
+      walkie_qr: {
+        description: 'Returns the Walkie-Talkie connection info for the mobile PWA. Show the result to the user as-is.',
+        args: {},
+        async execute() {
+          if (!server) return 'Server not started';
+          const ip = getLocalIp();
+          const port = server.getPort();
+          const token = server.getToken();
+          return `<walkie-connection ip="${ip}" port="${port}" token="${token}" />`;
+        }
       }
     },
-
-    // Hook: New message received
-    'message.updated': async (event: any) => {
+    
+    event: async ({ event }: any) => {
       if (!server) return;
-      
-      // Check if this is a new message
-      if (event.message && !event.isUpdate) {
-        const message: Message = {
-          id: event.message.id || String(Date.now()),
-          role: event.message.role,
-          content: event.message.content,
-          timestamp: Date.now(),
-        };
+
+      if (event.type === 'session.created') {
+        sessionId = event.properties?.info?.id ?? null;
+      }
+
+      if (event.type === 'message.updated' && event.properties?.info?.role === 'assistant') {
+        const info = event.properties.info;
+        const resp = await client.session.message({ 
+          path: { id: info.sessionID, messageID: info.id } 
+        }).catch(() => ({ data: null }));
         
-        server.addMessage(message);
-        server.broadcast({
-          type: 'new_message',
-          message,
-        });
+        const parts = resp.data?.parts || [];
+        const text = parts.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('');
+        
+        if (text) {
+          server.broadcast({ 
+            type: 'new_message', 
+            message: { role: 'assistant', content: text, timestamp: Date.now() } 
+          });
+        }
+      }
+
+      if (event.type === 'session.status' && event.status === 'awaiting_input') {
+        server.broadcast({ type: 'awaiting_input' });
+      }
+
+      if (event.type === 'session.idle') {
+        server.broadcast({ type: 'end' });
       }
     },
 
-    // Hook: Session awaiting input
-    'session.status': async (event: any) => {
-      if (server && event.status === 'awaiting_input') {
-        server.broadcast({
-          type: 'awaiting_input',
-          prompt: event.prompt,
-        });
-      }
-    },
+    'experimental.text.complete': async (_input: any, output: { text: string }) => {
+      const match = output.text.match(WALKIE_XML_RE);
+      if (!match) return;
+
+      const [fullMatch, ip, port, token] = match;
+      const wsUrl = token ? `wss://${ip}:${port}/${token}` : `wss://${ip}:${port}`;
+
+      const httpUrl = `https://${ip}:${port}`;
+      const qr = await generateQRCode(httpUrl);
+      const replacement = `\`\`\`\n${qr}\n\`\`\`\nOpen on phone: ${httpUrl}\nWebSocket: ${wsUrl}`;
+      output.text = output.text.replace(fullMatch, replacement);
+    }
   };
 };
-
-export default WalkieTalkiePlugin;
