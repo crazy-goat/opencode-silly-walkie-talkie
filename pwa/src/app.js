@@ -12,6 +12,11 @@ class WalkieApp {
     
     // Check URL for auto-connect
     const urlParams = new URLSearchParams(window.location.search);
+    const wsUrl = urlParams.get('wsUrl');
+    if (wsUrl && (wsUrl.startsWith('ws://') || wsUrl.startsWith('wss://'))) {
+      this._connectWs(wsUrl);
+      return;
+    }
     const autoUrl = urlParams.get('url');
     if (autoUrl) {
       this._connect(autoUrl);
