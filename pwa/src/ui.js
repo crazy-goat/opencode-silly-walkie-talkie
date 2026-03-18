@@ -67,6 +67,16 @@ class WalkieUI {
     }
   }
 
+  renderQuestion(data) {
+    if (!this.messagesEl) return;
+
+    for (const q of data.questions) {
+      const optionsList = q.options.map(o => `• ${o.label}: ${o.description}`).join('\n');
+      const text = `${q.question}\n\nOptions:\n${optionsList}`;
+      this.addMessage({ role: 'assistant', content: text, timestamp: Date.now() });
+    }
+  }
+
   _escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;

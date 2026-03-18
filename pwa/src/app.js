@@ -3,6 +3,7 @@ class WalkieApp {
   constructor() {
     this.ui = new WalkieUI();
     this.scanner = null;
+    this.pendingQuestion = null;
   }
 
   init() {
@@ -90,6 +91,15 @@ class WalkieApp {
     walkieClient.on('awaiting_input', () => {
       this.ui.setStatus('connected', 'Waiting for input');
     });
+
+    walkieClient.on('question', (data) => {
+      this.ui.renderQuestion(data);
+      this._setPendingQuestion(data.requestID, data.questions);
+    });
+  }
+
+  _setPendingQuestion(requestID, questions) {
+    this.pendingQuestion = { requestID, questions };
   }
 
   _setupInput() {
@@ -102,8 +112,18 @@ class WalkieApp {
     const send = () => {
       const text = textarea.value.trim();
       if (!text) return;
-      walkieClient.send({ type: 'send_message', content: text });
-      this.ui.addMessage({ role: 'user', content: text, timestamp: Date.now() });
+
+      if (this.pendingQuestion) {
+        const { requestID, questions } = this.pendingQuestion;
+        this.pendingQuestion = null;
+        const answers = questions.map(() => [text]);
+        walkieClient.send({ type: 'answer_question', requestID, answers });
+        this.ui.addMessage({ role: 'user', content: text, timestamp: Date.now() });
+      } else {
+        walkieClient.send({ type: 'send_message', content: text });
+        this.ui.addMessage({ role: 'user', content: text, timestamp: Date.now() });
+      }
+
       textarea.value = '';
     };
 
