@@ -88,6 +88,39 @@ When you start OpenCode, the plugin will:
 3. Scan the QR code displayed in OpenCode terminal
 4. You're connected!
 
+## Multi-Session Web UI
+
+The Web UI is a Docker-hosted dashboard that lets you monitor and interact with multiple OpenCode sessions from a browser.
+
+### Start the Web UI
+
+```bash
+docker compose -f docker-compose.webui.yml up -d
+```
+
+Open `https://localhost:3001` in your browser (accept the self-signed certificate warning).
+
+### Add a Session
+
+1. In OpenCode, call the `walkie_qr` tool — it prints a QR and a `WebSocket: wss://...` URL
+2. Copy the `wss://...` URL
+3. Paste it into the Web UI input and click **Add Session**
+4. The session appears in the list with a status dot (grey → yellow → green when connected)
+5. Click the session to open the chat view
+
+### Session List
+
+Each session shows:
+- Status dot: grey (disconnected), yellow (connecting), green (connected), red (error)
+- WS URL of the session
+- Remove button (✕) to disconnect and remove the session
+
+### Stop the Web UI
+
+```bash
+docker compose -f docker-compose.webui.yml down
+```
+
 ## Using the PWA
 
 ### Option A: Local Development
@@ -144,6 +177,7 @@ The certificate is valid for 10 years and reused across sessions.
 
 ```
 OpenCode (plugin)  ←──WebSocket──→  PWA (phone/tablet)
+OpenCode (plugin)  ←──WebSocket──→  Web UI (browser, multi-session)
 ```
 
 ## Protocol
