@@ -145,7 +145,7 @@ Deploy `pwa/` folder to any static hosting:
 
 ## TLS / HTTPS
 
-Walkie-Talkie requires HTTPS/WSS because browsers block camera access on plain HTTP.
+Walkie-Talkie requires HTTPS/WSS because browsers block WebSocket connections to untrusted origins.
 The plugin auto-generates a self-signed TLS certificate on first start and saves it to:
 
 ```
@@ -153,10 +153,76 @@ The plugin auto-generates a self-signed TLS certificate on first start and saves
 ~/.config/opencode/walkie-tls/key.pem
 ```
 
-### Accepting the certificate on your phone
+For the Web UI to connect to the plugin's WebSocket, **the browser must trust the plugin's certificate**. Without this, connections will silently fail.
 
-When you open the PWA URL on your phone, you'll see a "Your connection is not private" warning.
-This is expected for self-signed certs. Tap **Advanced → Proceed** (Chrome) or **Show Details → visit this website** (Safari).
+### Trusting the certificate (one-time setup)
+
+#### macOS
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain \
+  ~/.config/opencode/walkie-tls/cert.pem
+```
+
+Then restart your browser.
+
+#### Linux (Chrome/Chromium)
+
+```bash
+# Install certutil if needed
+sudo apt install libnss3-tools   # Debian/Ubuntu
+# or
+sudo dnf install nss-tools       # Fedora
+
+# Add to Chrome's NSS database
+certutil -A -n "walkie-talkie-local" \
+  -t "CT,," \
+  -i ~/.config/opencode/walkie-tls/cert.pem \
+  -d sql:$HOME/.pki/nssdb
+
+# Add to Chromium's NSS database (if using Chromium)
+certutil -A -n "walkie-talkie-local" \
+  -t "CT,," \
+  -i ~/.config/opencode/walkie-tls/cert.pem \
+  -d sql:$HOME/.config/chromium/Default
+```
+
+Then restart your browser.
+
+#### Linux (Firefox)
+
+```bash
+# Find your Firefox profile directory
+ls ~/.mozilla/firefox/*.default-release/
+
+# Add certificate
+certutil -A -n "walkie-talkie-local" \
+  -t "CT,," \
+  -i ~/.config/opencode/walkie-tls/cert.pem \
+  -d ~/.mozilla/firefox/<your-profile>/
+```
+
+Then restart Firefox.
+
+#### Windows
+
+```powershell
+Import-Certificate -FilePath "$env:USERPROFILE\.config\opencode\walkie-tls\cert.pem" `
+  -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+Run in PowerShell as Administrator, then restart your browser.
+
+### Verifying the certificate is trusted
+
+After adding the certificate, open the plugin's WebSocket URL directly in your browser:
+
+```
+https://<ip>:<port>
+```
+
+You should see a plain page (not a certificate warning). If you see the page without warnings, the Web UI will be able to connect.
 
 ### Generating the certificate manually
 
