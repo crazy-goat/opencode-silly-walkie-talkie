@@ -15,6 +15,16 @@ class WalkieClient {
   connect(url, token) {
     this.url = url;
     this.token = token;
+    this.fullUrl = null;
+    this.reconnectAttempts = 0;
+    this.lastHeartbeat = Date.now();
+    this._connect();
+  }
+
+  connectUrl(fullWsUrl) {
+    this.fullUrl = fullWsUrl;
+    this.url = null;
+    this.token = null;
     this.reconnectAttempts = 0;
     this.lastHeartbeat = Date.now();
     this._connect();
@@ -30,7 +40,7 @@ class WalkieClient {
       this.ws.close();
     }
 
-    const wsUrl = this.url.replace(/^http/, 'ws') + `/${this.token}`;
+    const wsUrl = this.fullUrl || (this.url.replace(/^http/, 'ws') + `/${this.token}`);
     console.log('[Walkie] Connecting to:', wsUrl);
 
     this.ws = new WebSocket(wsUrl);

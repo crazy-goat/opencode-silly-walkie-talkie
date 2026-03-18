@@ -25,10 +25,7 @@ class SessionApp {
 
   _connect(wsUrl) {
     this.ui.setStatus('connecting', 'Connecting...');
-    const parsed = new URL(wsUrl);
-    const token = parsed.pathname.replace(/^\//, '');
-    const base = `${parsed.protocol}//${parsed.host}`;
-    this.client.connect(base, token);
+    this.client.connectUrl(toProxyUrl(wsUrl));
   }
 
   _setupListeners() {

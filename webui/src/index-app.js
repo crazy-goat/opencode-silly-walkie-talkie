@@ -114,16 +114,12 @@ class IndexApp {
     const client = new WalkieClient();
     this.clients.set(wsUrl, client);
 
-    const parsed = new URL(wsUrl);
-    const token = parsed.pathname.replace(/^\//, '');
-    const base = `${parsed.protocol}//${parsed.host}`;
-
     client.on('connected', () => { dot.className = 'session-status-dot connected'; });
     client.on('disconnected', () => { dot.className = 'session-status-dot'; });
     client.on('error', () => { dot.className = 'session-status-dot error'; });
 
     dot.className = 'session-status-dot connecting';
-    client.connect(base, token);
+    client.connectUrl(toProxyUrl(wsUrl));
   }
 }
 
