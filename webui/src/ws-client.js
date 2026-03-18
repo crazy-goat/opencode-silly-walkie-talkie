@@ -146,5 +146,3 @@ class WalkieClient {
   }
 }
 
-// Create global instance
-const walkieClient = new WalkieClient();
