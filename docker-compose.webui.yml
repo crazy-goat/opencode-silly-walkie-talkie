@@ -10,16 +10,21 @@ services:
     restart: unless-stopped
     command: >
       sh -c "
-        if [ -f /etc/walkie-tls/cert.pem ] && [ -f /etc/walkie-tls/key.pem ]; then
-          cp /etc/walkie-tls/cert.pem /etc/nginx/ssl.crt &&
-          cp /etc/walkie-tls/key.pem /etc/nginx/ssl.key;
-        else
-          echo 'Plugin TLS keys not found, generating self-signed certificate...' &&
-          apk add --no-cache openssl &&
-          openssl req -x509 -nodes -days 3650 -newkey rsa:2048
-            -keyout /etc/nginx/ssl.key
-            -out /etc/nginx/ssl.crt
-            -subj '/CN=walkie-talkie-local';
+        if [ ! -f /etc/walkie-tls/cert.pem ] || [ ! -f /etc/walkie-tls/key.pem ]; then
+          echo '';
+          echo 'ERROR: TLS certificates not found.';
+          echo '';
+          echo 'Run OpenCode once to auto-generate them, or generate manually:';
+          echo '';
+          echo '  mkdir -p ~/.config/opencode/walkie-tls';
+          echo '  openssl req -x509 -newkey rsa:2048 -nodes -days 3650';
+          echo '    -keyout ~/.config/opencode/walkie-tls/key.pem';
+          echo '    -out ~/.config/opencode/walkie-tls/cert.pem';
+          echo '    -subj /CN=walkie-talkie-local';
+          echo '';
+          exit 1;
         fi &&
+        cp /etc/walkie-tls/cert.pem /etc/nginx/ssl.crt &&
+        cp /etc/walkie-tls/key.pem /etc/nginx/ssl.key &&
         nginx -g 'daemon off;'
       "
