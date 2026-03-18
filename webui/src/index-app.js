@@ -36,7 +36,7 @@ class IndexApp {
 
       const dot = document.createElement('div');
       dot.className = 'session-status-dot';
-      dot.id = `dot-${btoa(s.wsUrl).replace(/[^a-z0-9]/gi, '')}`;
+      dot.id = `dot-${s.wsUrl.replace(/[^a-z0-9]/gi, '_')}`;
 
       const label = document.createElement('div');
       label.className = 'session-label';
@@ -67,7 +67,21 @@ class IndexApp {
   }
 
   _connectStatus(wsUrl, dot) {
-    if (this.clients.has(wsUrl)) return;
+    if (this.clients.has(wsUrl)) {
+      // Client already exists — update listeners to use new dot element
+      const client = this.clients.get(wsUrl);
+      client.listeners.delete('connected');
+      client.listeners.delete('disconnected');
+      client.listeners.delete('error');
+      client.on('connected', () => { dot.className = 'session-status-dot connected'; });
+      client.on('disconnected', () => { dot.className = 'session-status-dot'; });
+      client.on('error', () => { dot.className = 'session-status-dot error'; });
+      // Restore current visual state
+      const ws = client.ws;
+      if (ws && ws.readyState === WebSocket.OPEN) dot.className = 'session-status-dot connected';
+      else if (ws && ws.readyState === WebSocket.CONNECTING) dot.className = 'session-status-dot connecting';
+      return;
+    }
 
     const client = new WalkieClient();
     this.clients.set(wsUrl, client);
@@ -76,15 +90,9 @@ class IndexApp {
     const token = parsed.pathname.replace(/^\//, '');
     const base = `${parsed.protocol}//${parsed.host}`;
 
-    client.on('connected', () => {
-      dot.className = 'session-status-dot connected';
-    });
-    client.on('disconnected', () => {
-      dot.className = 'session-status-dot';
-    });
-    client.on('error', () => {
-      dot.className = 'session-status-dot error';
-    });
+    client.on('connected', () => { dot.className = 'session-status-dot connected'; });
+    client.on('disconnected', () => { dot.className = 'session-status-dot'; });
+    client.on('error', () => { dot.className = 'session-status-dot error'; });
 
     dot.className = 'session-status-dot connecting';
     client.connect(base, token);

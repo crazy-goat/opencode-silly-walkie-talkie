@@ -8,6 +8,8 @@ class WalkieClient {
     this.heartbeatTimeout = null;
     this.lastHeartbeat = 0;
     this.listeners = new Map();
+    this._intentionalDisconnect = false;
+    this._heartbeatInterval = null;
   }
 
   connect(url, token) {
@@ -19,6 +21,11 @@ class WalkieClient {
   }
 
   _connect() {
+    this._intentionalDisconnect = false;
+    if (this._heartbeatInterval) {
+      clearInterval(this._heartbeatInterval);
+      this._heartbeatInterval = null;
+    }
     if (this.ws) {
       this.ws.close();
     }
@@ -67,9 +74,10 @@ class WalkieClient {
 
   _startHeartbeatMonitor() {
     // Check heartbeat every 10 seconds
-    const checkInterval = setInterval(() => {
+    this._heartbeatInterval = setInterval(() => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        clearInterval(checkInterval);
+        clearInterval(this._heartbeatInterval);
+        this._heartbeatInterval = null;
         return;
       }
 
@@ -84,12 +92,14 @@ class WalkieClient {
       if (timeSinceLastHeartbeat > 30000) {
         console.log('[Walkie] Heartbeat timeout, reconnecting...');
         this.ws.close();
-        clearInterval(checkInterval);
+        clearInterval(this._heartbeatInterval);
+        this._heartbeatInterval = null;
       }
     }, 1000);
   }
 
   _scheduleReconnect() {
+    if (this._intentionalDisconnect) return;
     const delay = Math.min(
       1000 * Math.pow(2, this.reconnectAttempts),
       this.maxReconnectDelay
@@ -112,6 +122,11 @@ class WalkieClient {
   }
 
   disconnect() {
+    this._intentionalDisconnect = true;
+    if (this._heartbeatInterval) {
+      clearInterval(this._heartbeatInterval);
+      this._heartbeatInterval = null;
+    }
     if (this.ws) {
       this.send({ type: 'bye' });
       this.ws.close();

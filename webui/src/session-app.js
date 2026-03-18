@@ -2,6 +2,7 @@ class SessionApp {
   constructor() {
     this.ui = new WalkieUI();
     this.client = new WalkieClient();
+    this._inputSetup = false;
   }
 
   init() {
@@ -64,6 +65,8 @@ class SessionApp {
   }
 
   _setupInput() {
+    if (this._inputSetup) return;
+    this._inputSetup = true;
     const textarea = document.getElementById('input-text');
     const button = document.getElementById('input-send');
     const container = document.getElementById('input-container');
