@@ -66,6 +66,7 @@ class SessionApp {
     this._inputSetup = true;
     const textarea = document.getElementById('input-text');
     const button = document.getElementById('input-send');
+    const micBtn = document.getElementById('mic-btn');
     const container = document.getElementById('input-container');
 
     container.style.display = 'flex';
@@ -81,6 +82,55 @@ class SessionApp {
     button.addEventListener('click', send);
     textarea.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    this._setupMic(micBtn, textarea);
+  }
+
+  _setupMic(micBtn, textarea) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      micBtn.style.display = 'none';
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || 'en-US';
+
+    let listening = false;
+    let baseText = '';
+
+    recognition.onstart = () => {
+      listening = true;
+      micBtn.textContent = '🔴';
+      micBtn.title = 'Stop recording';
+      baseText = textarea.value;
+    };
+
+    recognition.onresult = (e) => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+      textarea.value = baseText + (baseText && !baseText.endsWith(' ') ? ' ' : '') + transcript;
+    };
+
+    recognition.onend = () => {
+      listening = false;
+      micBtn.textContent = '🎤';
+      micBtn.title = 'Voice input';
+    };
+
+    recognition.onerror = () => {
+      listening = false;
+      micBtn.textContent = '🎤';
+    };
+
+    micBtn.addEventListener('click', () => {
+      if (listening) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
     });
   }
 }
