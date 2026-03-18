@@ -12,11 +12,15 @@
     <div id="session-list"></div>
     <div id="add-session">
       <input type="text" id="ws-url-input" placeholder="wss://ip:port/token" />
-      <button id="add-btn">Add Session</button>
+      <button id="add-btn">Add</button>
+      <button id="scan-btn">Scan QR</button>
     </div>
+    <div id="qr-reader" style="display:none"></div>
   </div>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="src/sessions.js"></script>
   <script src="src/ws-client.js"></script>
+  <script src="src/qr-scanner.js"></script>
   <script src="src/index-app.js"></script>
 </body>
 </html>

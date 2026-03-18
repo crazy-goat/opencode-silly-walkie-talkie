@@ -1,6 +1,7 @@
 class IndexApp {
   constructor() {
     this.clients = new Map();
+    this.scanner = null;
   }
 
   init() {
@@ -19,6 +20,33 @@ class IndexApp {
     document.getElementById('ws-url-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('add-btn').click();
     });
+
+    document.getElementById('scan-btn').addEventListener('click', () => {
+      this._toggleScanner();
+    });
+  }
+
+  _toggleScanner() {
+    const qrReader = document.getElementById('qr-reader');
+    if (this.scanner) {
+      this.scanner.stop();
+      this.scanner = null;
+      qrReader.style.display = 'none';
+      document.getElementById('scan-btn').textContent = 'Scan QR';
+      return;
+    }
+    qrReader.style.display = 'block';
+    document.getElementById('scan-btn').textContent = 'Stop Scan';
+    this.scanner = new QRScanner('qr-reader', (result) => {
+      const wsUrl = result.wsUrl;
+      if (wsUrl && (wsUrl.startsWith('ws://') || wsUrl.startsWith('wss://'))) {
+        sessionStore.add(wsUrl);
+      }
+      qrReader.style.display = 'none';
+      document.getElementById('scan-btn').textContent = 'Scan QR';
+      this.scanner = null;
+    });
+    this.scanner.start();
   }
 
   _render(sessions) {
