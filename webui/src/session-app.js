@@ -104,8 +104,8 @@ class SessionApp {
 
     recognition.onstart = () => {
       listening = true;
-      micBtn.textContent = '🔴';
-      micBtn.title = 'Stop recording';
+      micBtn.innerHTML = '<span aria-hidden="true">🔴</span>';
+      micBtn.setAttribute('aria-label', 'Stop recording');
       baseText = textarea.value;
     };
 
@@ -116,13 +116,14 @@ class SessionApp {
 
     recognition.onend = () => {
       listening = false;
-      micBtn.textContent = '🎤';
-      micBtn.title = 'Voice input';
+      micBtn.innerHTML = '<span aria-hidden="true">🎤</span>';
+      micBtn.setAttribute('aria-label', 'Voice input');
     };
 
     recognition.onerror = () => {
       listening = false;
-      micBtn.textContent = '🎤';
+      micBtn.innerHTML = '<span aria-hidden="true">🎤</span>';
+      micBtn.setAttribute('aria-label', 'Voice input');
     };
 
     micBtn.addEventListener('click', () => {
