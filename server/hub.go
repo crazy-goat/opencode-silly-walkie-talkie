@@ -6,13 +6,17 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
 type Session struct {
-	WsUrl string `json:"wsUrl"`
+	WsUrl     string    `json:"wsUrl"`
+	SessionID string    `json:"sessionId,omitempty"`
+	Title     string    `json:"title,omitempty"`
+	lastSeen  time.Time `json:"-"`
 }
 
 type hubEvent struct {
@@ -33,22 +37,62 @@ func NewHub() *Hub {
 	}
 }
 
-func (h *Hub) Run() {}
+func (h *Hub) Run() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		h.evictStale(60 * time.Second)
+	}
+}
+
+func (h *Hub) evictStale(ttl time.Duration) {
+	h.mu.Lock()
+	var stale []Session
+	for key, s := range h.sessions {
+		if time.Since(s.lastSeen) > ttl {
+			stale = append(stale, s)
+			delete(h.sessions, key)
+		}
+	}
+	h.mu.Unlock()
+	for _, s := range stale {
+		log.Printf("evicted stale session: %s", s.WsUrl)
+		h.broadcast(hubEvent{Type: "session.removed", Session: s})
+	}
+}
 
 func (h *Hub) add(s Session) {
 	h.mu.Lock()
-	h.sessions[s.WsUrl] = s
+	key := s.SessionID
+	if key == "" {
+		key = s.WsUrl
+	}
+	existing, exists := h.sessions[key]
+	s.lastSeen = time.Now()
+	h.sessions[key] = s
 	h.mu.Unlock()
-	h.broadcast(hubEvent{Type: "session.added", Session: s})
+	if !exists || existing.WsUrl != s.WsUrl || existing.SessionID != s.SessionID || existing.Title != s.Title {
+		h.broadcast(hubEvent{Type: "session.added", Session: s})
+	}
 }
 
 func (h *Hub) remove(wsUrl string) {
 	h.mu.Lock()
-	s, ok := h.sessions[wsUrl]
-	delete(h.sessions, wsUrl)
+	var found *Session
+	var foundKey string
+	for k, s := range h.sessions {
+		if s.WsUrl == wsUrl {
+			found = &s
+			foundKey = k
+			break
+		}
+	}
+	if found != nil {
+		delete(h.sessions, foundKey)
+	}
 	h.mu.Unlock()
-	if ok {
-		h.broadcast(hubEvent{Type: "session.removed", Session: s})
+	if found != nil {
+		h.broadcast(hubEvent{Type: "session.removed", Session: *found})
 	}
 }
 
@@ -75,6 +119,17 @@ func (h *Hub) unsubscribe(ch chan hubEvent) {
 	h.mu.Lock()
 	delete(h.clients, ch)
 	h.mu.Unlock()
+}
+
+func (h *Hub) HandleList(w http.ResponseWriter, r *http.Request) {
+	h.mu.RLock()
+	sessions := make([]Session, 0, len(h.sessions))
+	for _, s := range h.sessions {
+		sessions = append(sessions, s)
+	}
+	h.mu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
 }
 
 func (h *Hub) HandleRegister(w http.ResponseWriter, r *http.Request) {

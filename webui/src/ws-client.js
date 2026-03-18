@@ -10,6 +10,7 @@ class WalkieClient {
     this.listeners = new Map();
     this._intentionalDisconnect = false;
     this._heartbeatInterval = null;
+    this._reconnectTimeout = null;
   }
 
   connect(url, token) {
@@ -32,11 +33,16 @@ class WalkieClient {
 
   _connect() {
     this._intentionalDisconnect = false;
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
     if (this._heartbeatInterval) {
       clearInterval(this._heartbeatInterval);
       this._heartbeatInterval = null;
     }
     if (this.ws) {
+      this.ws.onclose = null;
       this.ws.close();
     }
 
@@ -117,7 +123,8 @@ class WalkieClient {
 
     console.log(`[Walkie] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
 
-    setTimeout(() => {
+    this._reconnectTimeout = setTimeout(() => {
+      this._reconnectTimeout = null;
       this.reconnectAttempts++;
       this._connect();
     }, delay);
@@ -133,13 +140,19 @@ class WalkieClient {
 
   disconnect() {
     this._intentionalDisconnect = true;
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
     if (this._heartbeatInterval) {
       clearInterval(this._heartbeatInterval);
       this._heartbeatInterval = null;
     }
     if (this.ws) {
+      this.ws.onclose = null;
       this.send({ type: 'bye' });
       this.ws.close();
+      this.ws = null;
     }
   }
 
@@ -166,8 +179,8 @@ class WalkieClient {
     }
   }
 
-  requestMessages() {
-    this.send({ type: 'get_messages' });
+  requestMessages(after) {
+    this.send(after ? { type: 'get_messages', after } : { type: 'get_messages' });
   }
 }
 

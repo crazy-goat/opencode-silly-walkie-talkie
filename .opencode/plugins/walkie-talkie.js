@@ -112,6 +112,7 @@ var WalkieServer = class {
           }
           self.clients.add(ws);
           ws.send(JSON.stringify({ payload: { type: "heartbeat", timestamp: Date.now() } }));
+          self.onClientConnected?.();
         },
         message(ws, data) {
           try {
@@ -123,6 +124,7 @@ var WalkieServer = class {
         close(ws) {
           self.onDebug?.("WS close", {});
           self.clients.delete(ws);
+          self.onClientDisconnected?.();
         }
       }
     });
@@ -134,11 +136,20 @@ var WalkieServer = class {
   }
   onMessage = null;
   onAnswer = null;
+  onClientConnected = null;
+  onClientDisconnected = null;
   _handleCommand(ws, command) {
     switch (command.type) {
-      case "get_messages":
-        ws.send(JSON.stringify({ payload: { type: "messages", messages: this.messages } }));
+      case "get_messages": {
+        const after = command.after;
+        let messages = this.messages;
+        if (after) {
+          const idx = messages.findIndex((m) => m.id === after);
+          messages = idx >= 0 ? messages.slice(idx + 1) : [];
+        }
+        ws.send(JSON.stringify({ payload: { type: "messages", messages } }));
         break;
+      }
       case "ping":
         ws.send(JSON.stringify({ payload: { type: "pong", timestamp: Date.now() } }));
         break;
@@ -169,11 +180,17 @@ var WalkieServer = class {
   addMessage(message) {
     this.messages.push(message);
   }
+  clearMessages() {
+    this.messages = [];
+  }
   getToken() {
     return this.token;
   }
   getPort() {
     return this.port;
+  }
+  getClientCount() {
+    return this.clients.size;
   }
   async stop() {
     await this.bunServer?.stop();
@@ -199,35 +216,88 @@ function getLocalIp() {
 // src/index.ts
 var server = null;
 var sessionId = null;
+var sessionTitle = null;
 var pendingMessage = null;
 var lastBroadcastId = null;
-var index_default = async ({ client }) => {
+var broadcastedTools = /* @__PURE__ */ new Set();
+var index_default = async ({ client, directory, serverUrl: _serverUrl }) => {
+  const _c = client?.event?._client || client?.session?._client;
   server = new WalkieServer("");
   const port = await server.start(0);
   const ip = getLocalIp();
   const wsUrl = `wss://${ip}:${port}`;
   const WEBUI_URL = process.env.WALKIE_WEBUI_URL || "https://localhost:3000";
-  const register = () => fetch(`${WEBUI_URL}/api/register`, {
+  const fetchInsecure = (url, opts) => fetch(url, { ...opts, tls: { rejectUnauthorized: false } }).catch(() => {
+  });
+  const register = (sid, title) => fetchInsecure(`${WEBUI_URL}/api/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ wsUrl })
-  }).catch(() => {
+    body: JSON.stringify({ wsUrl, sessionId: sid, title: title ?? void 0 })
   });
-  const unregister = () => fetch(`${WEBUI_URL}/api/register`, {
+  const unregister = () => fetchInsecure(`${WEBUI_URL}/api/register`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ wsUrl })
+  });
+  const fetchTitle = async (id) => {
+    const resp = await client.session.get({ path: { id } }).catch(() => ({ data: null }));
+    return resp?.data?.title || null;
+  };
+  const loadHistory = async (id) => {
+    const resp = await client.session.messages({ path: { id } }).catch(() => null);
+    const items = resp?.data ?? [];
+    server.clearMessages();
+    for (const item of items) {
+      const role = item.info?.role;
+      if (!role) continue;
+      const text = item.parts.filter((p) => p.type === "text" && !p.synthetic).map((p) => p.text).join("");
+      if (!text) continue;
+      server.addMessage({ role, content: text, timestamp: item.info?.time?.created ?? Date.now() });
+    }
+  };
+  const selectSession = async (newId, title) => {
+    const resolvedTitle = title || await fetchTitle(newId);
+    if (newId === sessionId) {
+      if (resolvedTitle && resolvedTitle !== sessionTitle) {
+        sessionTitle = resolvedTitle;
+        register(sessionId, sessionTitle);
+      }
+      return;
+    }
+    if (sessionId) unregister();
+    sessionId = newId;
+    sessionTitle = resolvedTitle;
+    broadcastedTools.clear();
+    await loadHistory(newId);
+    register(sessionId, sessionTitle);
+  };
+  const heartbeat = () => {
+    if (sessionId) register(sessionId, sessionTitle);
+  };
+  setInterval(heartbeat, 15e3).unref();
+  client.global.event().then(({ stream }) => {
+    client.session.list().then((resp) => {
+      const sessions = resp?.data ?? [];
+      const match = sessions.find((s) => s.directory === directory);
+      if (match) selectSession(match.id, match.title || null);
+    }).catch(() => {
+    });
+    (async () => {
+      try {
+        for await (const ev of stream) {
+          const event = ev?.payload;
+          if (!event) continue;
+          if (event.type === "tui.session.select") {
+            if (event.properties?.sessionID) await selectSession(event.properties.sessionID);
+          } else if (event.type === "session.created" || event.type === "session.updated") {
+            const info = event.properties?.info;
+            if (info?.id) await selectSession(info.id, info.title || null);
+          }
+        }
+      } catch {
+      }
+    })();
   }).catch(() => {
-  });
-  register();
-  process.on("exit", () => unregister());
-  process.on("SIGTERM", () => {
-    unregister();
-    process.exit(0);
-  });
-  process.on("SIGINT", () => {
-    unregister();
-    process.exit(0);
   });
   server.onMessage = (content) => {
     if (!sessionId) return;
@@ -239,43 +309,68 @@ var index_default = async ({ client }) => {
     });
   };
   server.onAnswer = (requestID, answers) => {
-    client.question.reply({
-      path: { requestID },
-      body: { answers }
+    _c.post({
+      url: `/question/${requestID}/reply`,
+      body: { answers },
+      headers: { "Content-Type": "application/json" }
     }).catch(() => {
     });
   };
   return {
     event: async ({ event }) => {
       if (!server) return;
-      if (event.type === "session.created") {
-        sessionId = event.properties?.info?.id ?? null;
+      if (event.type === "session.created" || event.type === "session.updated") {
+        const info = event.properties?.info;
+        if (info?.id) await selectSession(info.id, info.title || null);
+        return;
       }
       if (event.type === "message.updated" && event.properties?.info?.role === "assistant") {
         const info = event.properties.info;
+        if (info.sessionID !== sessionId) return;
         const resp = await client.session.message({
           path: { id: info.sessionID, messageID: info.id }
         }).catch(() => ({ data: null }));
         const parts = resp.data?.parts || [];
         const text = parts.filter((p) => p.type === "text").map((p) => p.text).join("");
-        if (text) {
-          pendingMessage = { id: info.id, text };
+        for (const p of parts) {
+          if (p.type === "tool" && p.state?.status === "completed" && !broadcastedTools.has(p.id)) {
+            broadcastedTools.add(p.id);
+            const input = p.state.input || {};
+            const file = input.filePath || input.path || input.file || input.filename || "";
+            const shortFile = file ? file.split("/").slice(-2).join("/") : "";
+            const toolName = p.tool.replace(/_/g, " ").toLowerCase();
+            const label = shortFile ? `${toolName} ${shortFile}` : toolName;
+            server.broadcast({ type: "tool_update", tool: { name: p.tool, label } });
+          }
         }
+        if (text) pendingMessage = { id: info.id, text, tools: [], parts };
       }
       const _flushPending = () => {
         if (pendingMessage && pendingMessage.id !== lastBroadcastId) {
           lastBroadcastId = pendingMessage.id;
-          const message = { role: "assistant", content: pendingMessage.text, timestamp: Date.now() };
+          const tools = (pendingMessage.parts || []).filter((p) => p.type === "tool" && p.state?.status === "completed").map((p) => {
+            const input = p.state.input || {};
+            const output = typeof p.state.output === "string" ? p.state.output : JSON.stringify(p.state.output ?? "");
+            return { name: p.tool, input, output };
+          });
+          const message = {
+            role: "assistant",
+            content: pendingMessage.text,
+            timestamp: Date.now()
+          };
+          if (tools.length) message.tools = tools;
           server.addMessage(message);
           server.broadcast({ type: "new_message", message });
         }
         pendingMessage = null;
       };
       if (event.type === "session.status" && event.properties?.status === "awaiting_input") {
+        if (event.properties?.sessionID !== sessionId) return;
         _flushPending();
         server.broadcast({ type: "awaiting_input" });
       }
       if (event.type === "session.idle") {
+        if (event.properties?.sessionID !== sessionId) return;
         _flushPending();
         server.broadcast({ type: "end" });
       }

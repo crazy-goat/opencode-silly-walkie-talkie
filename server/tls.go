@@ -14,6 +14,30 @@ import (
 	"time"
 )
 
+func localIPs() []net.IP {
+	ips := []net.IP{net.ParseIP("127.0.0.1")}
+	ifaces, _ := net.Interfaces()
+	for _, iface := range ifaces {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			if ip4 := ip.To4(); ip4 != nil {
+				ips = append(ips, ip4)
+			}
+		}
+	}
+	return ips
+}
+
 func ensureTLSCert(certFile, keyFile string) (tls.Certificate, error) {
 	if _, err := os.Stat(certFile); err == nil {
 		if _, err := os.Stat(keyFile); err == nil {
@@ -33,7 +57,7 @@ func ensureTLSCert(certFile, keyFile string) (tls.Certificate, error) {
 		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:  localIPs(),
 		DNSNames:     []string{"localhost"},
 	}
 

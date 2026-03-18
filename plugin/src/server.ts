@@ -94,6 +94,7 @@ export class WalkieServer {
           }
           self.clients.add(ws);
           ws.send(JSON.stringify({ payload: { type: 'heartbeat', timestamp: Date.now() } }));
+          self.onClientConnected?.();
         },
         message(ws: any, data: string) {
           try {
@@ -104,6 +105,7 @@ export class WalkieServer {
         close(ws: any) {
           self.onDebug?.('WS close', {});
           self.clients.delete(ws);
+          self.onClientDisconnected?.();
         },
       },
     });
@@ -119,12 +121,21 @@ export class WalkieServer {
 
   onMessage: ((content: string) => void) | null = null;
   onAnswer: ((requestID: string, answers: string[][]) => void) | null = null;
+  onClientConnected: (() => void) | null = null;
+  onClientDisconnected: (() => void) | null = null;
 
   private _handleCommand(ws: any, command: ClientCommand): void {
     switch (command.type) {
-      case 'get_messages':
-        ws.send(JSON.stringify({ payload: { type: 'messages', messages: this.messages } }));
+      case 'get_messages': {
+        const after = (command as any).after as string | undefined;
+        let messages = this.messages;
+        if (after) {
+          const idx = messages.findIndex(m => m.id === after);
+          messages = idx >= 0 ? messages.slice(idx + 1) : [];
+        }
+        ws.send(JSON.stringify({ payload: { type: 'messages', messages } }));
         break;
+      }
       case 'ping':
         ws.send(JSON.stringify({ payload: { type: 'pong', timestamp: Date.now() } }));
         break;
@@ -155,12 +166,20 @@ export class WalkieServer {
     this.messages.push(message);
   }
 
+  clearMessages(): void {
+    this.messages = [];
+  }
+
   getToken(): string {
     return this.token;
   }
 
   getPort(): number {
     return this.port;
+  }
+
+  getClientCount(): number {
+    return this.clients.size;
   }
 
   async stop(): Promise<void> {

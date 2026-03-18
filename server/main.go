@@ -22,6 +22,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/sessions/ws", hub)
+	mux.HandleFunc("/api/sessions", hub.HandleList)
 	mux.HandleFunc("/api/register", hub.HandleRegister)
 	mux.HandleFunc("/ws/", HandleProxy)
 	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))

@@ -1,13 +1,27 @@
 // WebSocket Protocol Types for OpenCode Walkie-Talkie
 
-export type EventType = 'heartbeat' | 'new_message' | 'end' | 'messages' | 'awaiting_input' | 'pong' | 'question';
+export type EventType = 'heartbeat' | 'new_message' | 'end' | 'messages' | 'awaiting_input' | 'pong' | 'question' | 'tool_update';
 export type CommandType = 'get_messages' | 'ping' | 'bye' | 'send_message' | 'answer_question';
+
+export interface ToolCall {
+  name: string;
+  input?: Record<string, any>;
+  output?: string;
+}
+
+export interface FileDiff {
+  file: string;
+  before: string;
+  after: string;
+}
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  tools?: ToolCall[];
+  diffs?: FileDiff[];
 }
 
 // Events: Server -> Client
@@ -60,6 +74,11 @@ export interface QuestionEvent {
   questions: QuestionInfoPayload[];
 }
 
+export interface ToolUpdateEvent {
+  type: 'tool_update';
+  tool: ToolCall;
+}
+
 export type ServerEvent = 
   | HeartbeatEvent 
   | NewMessageEvent 
@@ -67,11 +86,13 @@ export type ServerEvent =
   | MessagesEvent 
   | AwaitingInputEvent
   | PongEvent
-  | QuestionEvent;
+  | QuestionEvent
+  | ToolUpdateEvent;
 
 // Commands: Client -> Server
 export interface GetMessagesCommand {
   type: 'get_messages';
+  after?: string;
 }
 
 export interface PingCommand {
