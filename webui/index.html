@@ -3,14 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenCode Walkie-Talkie</title>
+  <title>Walkie-Talkie</title>
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
-  <div id="app">
-    <h1>Walkie-Talkie</h1>
-    <div id="session-list"></div>
+  <div id="layout">
+    <header id="topbar">
+      <span id="app-title">🎙 Walkie-Talkie</span>
+      <span id="hub-status" class="status-dot"></span>
+    </header>
+
+    <aside id="sidebar">
+      <div id="session-list"></div>
+    </aside>
+
+    <main id="chat-area">
+      <div id="chat-header">
+        <span id="chat-title">Select a session</span>
+        <span id="chat-status" class="status-dot"></span>
+      </div>
+      <div id="messages"></div>
+    </main>
+
+    <footer id="bottombar">
+      <button id="mic-btn" aria-label="Voice input"><span aria-hidden="true">🎤</span></button>
+      <textarea id="input-text" rows="1" placeholder="Type a message..."></textarea>
+      <button id="input-send">Send</button>
+    </footer>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="src/sessions.js"></script>
   <script src="src/ws-client.js"></script>
   <script src="src/index-app.js"></script>
