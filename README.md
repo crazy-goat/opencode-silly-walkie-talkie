@@ -48,24 +48,21 @@ sudo security add-trusted-cert -d -r trustRoot \
   ~/.config/opencode/walkie-tls/cert.pem
 ```
 
-**Linux (Chrome/Chromium):**
+**Linux (Debian/Ubuntu):**
 ```bash
-# Install certutil
-sudo apt install libnss3-tools   # Debian/Ubuntu
-sudo dnf install nss-tools       # Fedora
-
-# Trust in Chrome
-certutil -A -n "walkie-talkie-local" -t "CT,," \
-  -i ~/.config/opencode/walkie-tls/cert.pem \
-  -d sql:$HOME/.pki/nssdb
+sudo cp ~/.config/opencode/walkie-tls/cert.pem \
+  /usr/local/share/ca-certificates/walkie-talkie-local.crt
+sudo update-ca-certificates
 ```
 
-**Linux (Firefox):**
+**Linux (Fedora/RHEL):**
 ```bash
-certutil -A -n "walkie-talkie-local" -t "CT,," \
-  -i ~/.config/opencode/walkie-tls/cert.pem \
-  -d ~/.mozilla/firefox/<your-profile>/
+sudo cp ~/.config/opencode/walkie-tls/cert.pem \
+  /etc/pki/ca-trust/source/anchors/walkie-talkie-local.crt
+sudo update-ca-trust
 ```
+
+Restart your browser after running the command.
 
 **Windows (PowerShell as Administrator):**
 ```powershell
@@ -73,7 +70,7 @@ Import-Certificate -FilePath "$env:USERPROFILE\.config\opencode\walkie-tls\cert.
   -CertStoreLocation Cert:\LocalMachine\Root
 ```
 
-Restart your browser after adding the certificate.
+Restart your browser after running the command.
 
 **Verify:** Open `https://<your-ip>:<port>` in your browser — if no certificate warning appears, it's trusted.
 
