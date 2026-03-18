@@ -3,133 +3,118 @@ class WalkieApp {
   constructor() {
     this.ui = new WalkieUI();
     this.scanner = null;
-    this.isWorking = false;
   }
 
   init() {
     console.log('[App] Initializing Walkie-Talkie...');
     
-    // Setup event listeners
     this._setupClientListeners();
     
-    // Start QR scanner
+    // Check URL for auto-connect
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoUrl = urlParams.get('url');
+    if (autoUrl) {
+      this._connect(autoUrl);
+      return;
+    }
+
+    this._setupManualToggle();
     this._startScanner();
   }
 
+  _setupManualToggle() {
+    document.getElementById('connect-btn')?.addEventListener('click', () => {
+      const url = document.getElementById('server-url').value.trim();
+      if (url) this._connect(url);
+    });
+  }
+
+  _startScanner() {
+    this.scanner = new QRScanner('qr-reader', (result) => {
+      console.log('[App] QR scanned:', result);
+      this._connectWs(result.wsUrl);
+    });
+    this.scanner.start();
+  }
+
+  _connect(url) {
+    // Manual input or auto-connect from URL param
+    const wsUrl = url.startsWith('ws://') || url.startsWith('wss://') ? url : `wss://${url}`;
+    this._connectWs(wsUrl);
+  }
+
+  _connectWs(wsUrl) {
+    this.ui.setStatus('connecting', 'Connecting...');
+    document.getElementById('manual-container').style.display = 'none';
+    document.getElementById('qr-reader').style.display = 'none';
+
+    const parsed = new URL(wsUrl);
+    const token = parsed.pathname.replace(/^\//, '');
+    const base = `${parsed.protocol}//${parsed.host}`;
+    walkieClient.connect(base, token);
+  }
+
   _setupClientListeners() {
-    // Connection events
     walkieClient.on('connected', () => {
-      console.log('[App] Connected to plugin');
+      console.log('[App] Connected');
       this.ui.setStatus('connected', 'Connected');
-      this.ui.hideScanner();
-      
-      // Request message history
+      this._setupInput();
       walkieClient.requestMessages();
     });
 
     walkieClient.on('disconnected', () => {
       console.log('[App] Disconnected');
-      this.ui.setStatus('disconnected', 'Disconnected - reconnecting...');
-      this.isWorking = false;
+      this.ui.setStatus('disconnected', 'Disconnected');
+      document.getElementById('manual-container').style.display = 'block';
+      document.getElementById('input-container').style.display = 'none';
     });
 
-    walkieClient.on('error', (data) => {
-      console.error('[App] Connection error:', data);
-      this.ui.setStatus('error', 'Connection error');
-    });
-
-    // Data events
-    walkieClient.on('heartbeat', () => {
-      // Heartbeat received, connection is alive
-      if (this.isWorking) {
-        this.ui.setStatus('working', 'LLM is working...');
-      }
+    walkieClient.on('error', () => {
+      this.ui.setStatus('error', 'Connection failed');
+      document.getElementById('manual-container').style.display = 'block';
     });
 
     walkieClient.on('new_message', (data) => {
-      console.log('[App] New message:', data);
       this.ui.addMessage(data.message);
-      this.isWorking = true;
-      this.ui.setStatus('working', 'LLM is working...');
     });
 
     walkieClient.on('end', () => {
-      console.log('[App] LLM finished');
-      this.isWorking = false;
-      this.ui.setStatus('connected', 'Done ✓');
-      
-      // Play notification sound (optional)
-      this._playNotificationSound();
-    });
-
-    walkieClient.on('messages', (data) => {
-      console.log('[App] Received messages:', data);
-      this.ui.renderMessages(data.messages);
+      this.ui.setStatus('connected', 'Done');
     });
 
     walkieClient.on('awaiting_input', () => {
-      console.log('[App] Awaiting input');
-      this.ui.setStatus('connected', 'Waiting for your input');
-      this._showInputDialog();
+      this.ui.setStatus('connected', 'Waiting for input');
     });
   }
 
-  _startScanner() {
-    this.ui.setStatus('connecting', 'Scan QR code to connect');
+  _setupInput() {
+    const textarea = document.getElementById('input-text');
+    const button = document.getElementById('input-send');
+    const container = document.getElementById('input-container');
     
-    this.scanner = new QRScanner('qr-reader', (result) => {
-      console.log('[App] QR scanned:', result);
-      walkieClient.connect(result.url, result.token);
+    container.style.display = 'flex';
+
+    const send = () => {
+      const text = textarea.value.trim();
+      if (!text) return;
+      walkieClient.send({ type: 'send_message', content: text });
+      this.ui.addMessage({ role: 'user', content: text, timestamp: Date.now() });
+      textarea.value = '';
+    };
+
+    button.addEventListener('click', send);
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
-
-    this.scanner.start();
-  }
-
-  _playNotificationSound() {
-    // Simple beep using Web Audio API
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (err) {
-      console.warn('[App] Could not play sound:', err);
-    }
-  }
-
-  _showInputDialog() {
-    // Simple prompt for now
-    // In production, you'd show a proper input UI
-    const input = prompt('LLM is waiting for your response:');
-    if (input) {
-      walkieClient.send({
-        type: 'send_message',
-        content: input,
-      });
-    }
   }
 }
 
-// Initialize app when DOM is ready
+// Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  const app = new WalkieApp();
-  app.init();
+  new WalkieApp().init();
 });
 
-// Register service worker (minimal)
+// Unregister service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-    .then(reg => console.log('[App] Service Worker registered'))
-    .catch(err => console.log('[App] Service Worker registration failed:', err));
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
 }
